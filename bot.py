@@ -86,8 +86,8 @@ async def run_translate(interaction: discord.Interaction, text: str, steps: int)
 
 
 @bot.tree.command(name="translate", description="Run the last message through multiple languages")
-@app_commands.describe(steps="Number of translation steps (1–100, default 10)")
-async def translate_cmd(interaction: discord.Interaction, steps: int = 10):
+@app_commands.describe(steps="Number of translation steps (1–100, default 12)")
+async def translate_cmd(interaction: discord.Interaction, steps: int = 12):
     if steps < 1 or steps > 100:
         await interaction.response.send_message("Steps must be between 1 and 100.", ephemeral=True)
         return
