@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+GUILD_ID = os.getenv("GUILD_ID")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -71,11 +72,24 @@ def broken_telephone_sync(text: str, steps: int = 50) -> str:
     return current
 
 
+async def run_translate(interaction: discord.Interaction, text: str, steps: int):
+    if not text.strip():
+        await interaction.followup.send("That message has no text to translate.")
+        return
+
+    result = await asyncio.to_thread(broken_telephone_sync, text, steps)
+
+    if len(result) > 2000:
+        result = result[:1997] + "..."
+
+    await interaction.followup.send(result)
+
+
 @bot.tree.command(name="translate", description="Run the last message through multiple languages")
-@app_commands.describe(steps="Number of translation steps (5–50, default 10)")
+@app_commands.describe(steps="Number of translation steps (1–100, default 10)")
 async def translate_cmd(interaction: discord.Interaction, steps: int = 10):
-    if steps < 5 or steps > 50:
-        await interaction.response.send_message("Steps must be between 5 and 50.", ephemeral=True)
+    if steps < 1 or steps > 100:
+        await interaction.response.send_message("Steps must be between 1 and 100.", ephemeral=True)
         return
 
     await interaction.response.defer()
@@ -90,17 +104,27 @@ async def translate_cmd(interaction: discord.Interaction, steps: int = 10):
         await interaction.followup.send("No messages found to translate.")
         return
 
-    result = await asyncio.to_thread(broken_telephone_sync, last_msg.content, steps)
+    await run_translate(interaction, last_msg.content, steps)
 
-    if len(result) > 2000:
-        result = result[:1997] + "..."
 
-    await interaction.followup.send(result)
+@bot.tree.context_menu(name="Broken Telephone")
+async def translate_context(interaction: discord.Interaction, message: discord.Message):
+    await interaction.response.defer()
+    await run_translate(interaction, message.content, 10)
 
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
+    if GUILD_ID:
+        guild = discord.Object(id=int(GUILD_ID))
+        bot.tree.copy_global_to(guild=guild)
+        await bot.tree.sync(guild=guild)
+        bot.tree.clear_commands(guild=None)
+        await bot.tree.sync()  # wipe global commands
+        print(f"Commands synced to guild {GUILD_ID}")
+    else:
+        await bot.tree.sync()
+        print("Commands synced globally")
     print(f"Logged in as {bot.user}")
     await asyncio.to_thread(get_language_pool)
     print("[pool] Ready")
